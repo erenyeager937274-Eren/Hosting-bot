@@ -9,10 +9,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- CONFIG ---
-API_ID = int(os.environ.get("API_ID", 0))
-API_HASH = os.environ.get("API_HASH", "")
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
-OWNER_ID = int(os.environ.get("OWNER_ID", 0))
+API_ID = int(os.environ.get("API_ID", 23264133))
+API_HASH = os.environ.get("API_HASH", "945e5b76ce8550bebbeeaf5599e7ce58")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "8524126181:AAE1MhlELlzui8z3m_9C3vRGCo8CK74l4kY")
+OWNER_ID = int(os.environ.get("OWNER_ID", 6883111123))
 
 app = Client("UniversalHoster", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
