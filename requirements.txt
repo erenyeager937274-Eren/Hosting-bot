@@ -4,4 +4,4 @@ python-dotenv
 motor
 dnspython
 psutil
-
+aiohttp
