@@ -1,80 +1,70 @@
 import os
 import subprocess
 import shutil
-import psutil
+import asyncio
 from pyrogram import Client, filters
+from aiohttp import web
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# Config
-API_ID = int(os.environ.get("API_ID"))
-API_HASH = os.environ.get("API_HASH")
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
-OWNER_ID = int(os.environ.get("OWNER_ID"))
+# --- CONFIG ---
+API_ID = int(os.environ.get("API_ID", 0))
+API_HASH = os.environ.get("API_HASH", "")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
+OWNER_ID = int(os.environ.get("OWNER_ID", 0))
 
 app = Client("UniversalHoster", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-# Sabhi hosted bots ke liye ek folder
-BASE_DIR = "all_bots"
-if not os.path.exists(BASE_DIR):
-    os.mkdir(BASE_DIR)
+# --- WEB SERVER FOR RENDER (Port Binding) ---
+async def handle(request):
+    return web.Response(text="Bot is Running! 🚀")
 
-@app.on_message(filters.command("start"))
-async def start(client, message):
-    await message.reply("🚀 **Universal Hosting Bot Tyar Hai!**\n\nKoshish karein: `/deploy link | token | session` (agar session chahiye)")
+async def start_web_server():
+    server = web.Application()
+    server.router.add_get("/", handle)
+    runner = web.AppRunner(server)
+    await runner.setup()
+    # Render khud PORT environment variable deta hai
+    port = int(os.environ.get("PORT", 8080))
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+    print(f"✅ Web Server started on port {port}")
 
+# --- DEPLOY COMMAND ---
 @app.on_message(filters.command("deploy") & filters.user(OWNER_ID))
 async def deploy_any_bot(client, message):
     try:
-        # Format: /deploy repo_link | bot_token | (optional variables)
         args = message.text.split(" ", 1)[1]
-        parts = [p.strip() for p in args.split("|")]
-        repo_url = parts[0]
-        bot_token = parts[1]
+        repo_url, b_token = [p.strip() for p in args.split("|")]
     except:
-        return await message.reply("❌ **Format Galat Hai!**\nUse: `/deploy link | token`")
+        return await message.reply("❌ **Format:** `/deploy link | token`")
 
-    # Bot ka unique naam (Repo ke naam se)
     repo_name = repo_url.split("/")[-1].replace(".git", "")
-    path = f"{BASE_DIR}/{repo_name}"
+    path = f"bots/{repo_name}"
 
-    m = await message.reply(f"🔍 **{repo_name}** ko check kar raha hoon...")
+    m = await message.reply(f"🚀 **{repo_name}** ko deploy kar raha hoon...")
 
-    # Purana version delete karein agar hai toh
-    if os.path.exists(path):
-        shutil.rmtree(path)
-
-    await m.edit("📥 **GitHub se Clone kar raha hoon...**")
+    if os.path.exists(path): shutil.rmtree(path)
     os.system(f"git clone {repo_url} {path}")
 
-    await m.edit("📝 **Environment Variables (Vars) set kar raha hoon...**")
-    # Har bot ke liye alag .env file banana
     with open(f"{path}/.env", "w") as f:
-        f.write(f"API_ID={API_ID}\nAPI_HASH={API_HASH}\nBOT_TOKEN={bot_token}\n")
-        # Agar user ne aur vars diye hain toh yahan add ho sakte hain
+        f.write(f"API_ID={API_ID}\nAPI_HASH={API_HASH}\nBOT_TOKEN={b_token}\n")
 
-    await m.edit("📦 **Requirements install kar raha hoon... (Isme time lag sakta hai)**")
+    await m.edit("📦 **Installing Requirements...**")
     subprocess.run(["pip", "install", "-r", f"{path}/requirements.txt"])
 
-    await m.edit("🚀 **Bot ko Background mein Start kar raha hoon...**")
-    
-    # Ye command bot ke main file ko dhund kar chala degi (main.py ya bot.py)
-    # Sabse aacha tarika hai 'python3 -m bot' ya direct file run karna
+    await m.edit("✅ **Bot Started in Background!**")
     log_file = open(f"{path}/logs.txt", "w")
-    process = subprocess.Popen(
-        ["python3", "-m", "bot"], # Ya fir "python3", "main.py"
-        cwd=path,
-        stdout=log_file,
-        stderr=log_file
-    )
+    subprocess.Popen(["python3", "-m", "bot"], cwd=path, stdout=log_file, stderr=log_file)
 
-    await m.edit(f"✅ **{repo_name} Deploy Ho Gaya!**\n\n**PID:** `{process.pid}`\n**Status:** Running 🟢")
+# --- START BOTH ---
+async def main():
+    await start_web_server() # Render ki requirement
+    await app.start()
+    print("🔥 Manager Bot is Live!")
+    await asyncio.Event().wait()
 
-@app.on_message(filters.command("stop_all") & filters.user(OWNER_ID))
-async def stop_all(client, message):
-    # Sabhi background processes ko band karne ka logic
-    os.system("pkill python3")
-    await message.reply("🛑 Sabhi hosted bots band kar diye gaye hain.")
-
-app.run()
+if __name__ == "__main__":
+    asyncio.get_event_loop().run_until_complete(main())
+    
